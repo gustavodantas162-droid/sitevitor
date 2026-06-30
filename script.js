@@ -49,6 +49,52 @@
   const video = document.querySelector(".js-sales-video");
   const videoPlayer = document.querySelector(".video-player");
   const videoStart = document.querySelector(".js-video-start");
+  const progressBar = document.querySelector(".js-vsl-progress");
+  const unlockAt = 60;
+  const fastProgressUntil = 15;
+  const unlockStorageKey = "manualAppearanceVslUnlocked";
+  let playbackStarted = false;
+  let furthestTime = 0;
+  let isCorrectingSeek = false;
+
+  const unlockPage = () => {
+    if (!document.body.classList.contains("vsl-locked")) return;
+
+    document.body.classList.remove("vsl-locked");
+    document.body.classList.add("vsl-unlocked");
+
+    try {
+      localStorage.setItem(unlockStorageKey, "true");
+    } catch (error) {
+      // Storage may be unavailable in privacy-restricted browsers.
+    }
+  };
+
+  try {
+    if (localStorage.getItem(unlockStorageKey) === "true") unlockPage();
+  } catch (error) {
+    // The first visit remains locked when storage is unavailable.
+  }
+
+  const updateProgress = () => {
+    if (!video || !progressBar) return;
+
+    const currentTime = Math.max(0, video.currentTime || 0);
+    const duration = Number.isFinite(video.duration) && video.duration > fastProgressUntil
+      ? video.duration
+      : 122;
+    let progress;
+
+    if (currentTime <= fastProgressUntil) {
+      progress = (currentTime / fastProgressUntil) * 0.5;
+    } else {
+      progress = 0.5 + ((currentTime - fastProgressUntil) / (duration - fastProgressUntil)) * 0.5;
+    }
+
+    progressBar.style.transform = `scaleX(${Math.min(1, Math.max(0, progress))})`;
+
+    if (currentTime >= unlockAt) unlockPage();
+  };
 
   if (video) {
     video.poster = posterUrl;
@@ -60,14 +106,48 @@
     source.type = "video/mp4";
     video.appendChild(source);
     videoPlayer?.classList.add("has-video");
+    video.controls = false;
+    video.disablePictureInPicture = true;
+    video.setAttribute("controlslist", "nodownload nofullscreen noremoteplayback");
 
     videoStart?.addEventListener("click", () => {
-      video.controls = true;
       video.muted = false;
       video.volume = 1;
-      videoPlayer?.classList.add("is-started");
+      playbackStarted = true;
+      video.play()
+        .then(() => videoPlayer?.classList.add("is-started"))
+        .catch(() => {
+          playbackStarted = false;
+          videoPlayer?.classList.remove("is-started");
+        });
+    });
+
+    video.addEventListener("timeupdate", () => {
+      if (!isCorrectingSeek) furthestTime = Math.max(furthestTime, video.currentTime);
+      updateProgress();
+    });
+
+    video.addEventListener("seeking", () => {
+      if (!playbackStarted || isCorrectingSeek) return;
+      if (video.currentTime <= furthestTime + 0.75) return;
+
+      isCorrectingSeek = true;
+      video.currentTime = furthestTime;
+      isCorrectingSeek = false;
+    });
+
+    video.addEventListener("pause", () => {
+      if (!playbackStarted || video.ended || document.visibilityState !== "visible") return;
       video.play().catch(() => {});
     });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && playbackStarted && !video.ended) {
+        video.play().catch(() => {});
+      }
+    });
+
+    video.addEventListener("ended", updateProgress);
 
     video.addEventListener("error", () => {
       videoPlayer?.classList.remove("has-video");
