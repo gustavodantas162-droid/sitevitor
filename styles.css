@@ -359,7 +359,7 @@ button {
   aspect-ratio: 9 / 16;
   background: #eaf4ff;
   object-fit: cover;
-  pointer-events: none;
+  pointer-events: auto;
   user-select: none;
 }
 
@@ -369,6 +369,40 @@ button {
 
 .has-video .video-fallback {
   display: none;
+}
+
+.video-start {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: none;
+  place-items: center;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: rgba(3, 8, 15, 0.12);
+  cursor: pointer;
+}
+
+.has-video:not(.is-started) .video-start {
+  display: grid;
+}
+
+.video-start:hover .play-orb,
+.video-start:focus-visible .play-orb {
+  border-color: rgba(85, 194, 255, 0.78);
+  background: rgba(8, 28, 48, 0.94);
+  transform: scale(1.06);
+}
+
+.video-start:focus-visible {
+  outline: 2px solid #55c2ff;
+  outline-offset: -5px;
+}
+
+.video-start .play-orb {
+  margin: 0;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
 }
 
 .video-fallback {

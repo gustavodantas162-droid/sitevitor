@@ -21,8 +21,8 @@
     <script>
       window.PAGE_CONFIG = {
         checkoutUrl: "#oferta",
-        vslVideoUrl: "",
-        vslPosterUrl: "./assets/vitor-hero.png"
+        vslVideoUrl: "./assets/vsl-manual-aparencia.mp4",
+        vslPosterUrl: "./assets/vsl-poster.jpg"
       };
     </script>
 
@@ -39,13 +39,15 @@
                 <div class="video-media">
                   <video
                     class="video-video js-sales-video"
-                    autoplay
-                    muted
                     playsinline
-                    preload="metadata"
-                    poster="./assets/vitor-hero.png"
-                    tabindex="-1"
+                    preload="none"
+                    poster="./assets/vsl-poster.jpg"
+                    aria-label="Apresentação do Manual da Aparência"
                   ></video>
+
+                  <button class="video-start js-video-start" type="button" aria-label="Reproduzir vídeo">
+                    <span class="play-orb" aria-hidden="true"></span>
+                  </button>
 
                   <div class="video-fallback js-video-fallback">
                     <div class="play-orb" aria-hidden="true"></div>

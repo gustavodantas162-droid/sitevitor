@@ -48,8 +48,7 @@
 
   const video = document.querySelector(".js-sales-video");
   const videoPlayer = document.querySelector(".video-player");
-  const soundButton = document.querySelector(".js-sound-button");
-  const progress = document.querySelector(".js-video-progress");
+  const videoStart = document.querySelector(".js-video-start");
 
   if (video) {
     video.poster = posterUrl;
@@ -61,24 +60,17 @@
     source.type = "video/mp4";
     video.appendChild(source);
     videoPlayer?.classList.add("has-video");
-    video.load();
 
-    video.play().catch(() => {
-      soundButton?.classList.remove("is-hidden");
-    });
-
-    soundButton?.addEventListener("click", () => {
+    videoStart?.addEventListener("click", () => {
+      video.controls = true;
       video.muted = false;
       video.volume = 1;
-      video.play().then(() => {
-        soundButton.classList.add("is-hidden");
-      }).catch(() => {});
+      videoPlayer?.classList.add("is-started");
+      video.play().catch(() => {});
     });
 
-    video.addEventListener("timeupdate", () => {
-      if (!progress || !video.duration) return;
-      const percent = Math.max(0, Math.min(video.currentTime / video.duration, 1));
-      progress.style.transform = `scaleX(${percent})`;
+    video.addEventListener("error", () => {
+      videoPlayer?.classList.remove("has-video");
     });
   }
 
