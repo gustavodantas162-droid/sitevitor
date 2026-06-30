@@ -2572,7 +2572,9 @@ body.vsl-unlocked .footer {
 
 .hero-grid {
   width: min(calc(100% - 32px), 1080px);
-  padding-top: clamp(24px, 3.5vw, 40px);
+  min-height: 100svh;
+  align-content: center;
+  padding: clamp(24px, 4svh, 52px) 0;
 }
 
 .hero-copy h1 {
@@ -2580,7 +2582,7 @@ body.vsl-unlocked .footer {
 }
 
 .video-wrap {
-  width: min(calc(100vw - 40px), 540px);
+  width: min(calc(100vw - 32px), 600px, calc(100svh - 150px));
 }
 
 .video-player {
@@ -2602,6 +2604,65 @@ body.vsl-unlocked .footer {
 
 .video-start {
   cursor: pointer;
+}
+
+.video-sound {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(85, 194, 255, 0.34);
+  border-radius: 999px;
+  color: #f4f8ff;
+  background: rgba(4, 14, 25, 0.82);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(12px);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.video-player.is-started:not(.is-audible) .video-sound {
+  display: inline-flex;
+}
+
+.video-sound:hover,
+.video-sound:focus-visible {
+  border-color: rgba(85, 194, 255, 0.72);
+  background: rgba(8, 28, 48, 0.94);
+}
+
+.video-sound:focus-visible {
+  outline: 2px solid #55c2ff;
+  outline-offset: 3px;
+}
+
+.video-sound-icon {
+  position: relative;
+  width: 15px;
+  height: 13px;
+  border-left: 7px solid currentColor;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+.video-sound-icon::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 2px;
+  width: 8px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
 }
 
 .vsl-progress {
@@ -2750,6 +2811,9 @@ body.vsl-unlocked .footer {
 
 @media (max-width: 430px) {
   .hero-grid {
+    min-height: 100svh;
+    align-content: center;
+    padding: 20px 0 28px;
     gap: 10px;
   }
 
@@ -2758,7 +2822,7 @@ body.vsl-unlocked .footer {
   }
 
   .video-wrap {
-    width: min(calc(100vw - 24px), 390px);
+    width: min(calc(100vw - 18px), 430px, calc(100svh - 130px));
   }
 
   .video-player {
@@ -2773,6 +2837,14 @@ body.vsl-unlocked .footer {
   .vsl-progress {
     height: 6px;
     margin-top: 10px;
+  }
+
+  .video-sound {
+    top: 10px;
+    right: 10px;
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 0.62rem;
   }
 
   .era-heading {

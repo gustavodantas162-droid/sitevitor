@@ -49,6 +49,7 @@
   const video = document.querySelector(".js-sales-video");
   const videoPlayer = document.querySelector(".video-player");
   const videoStart = document.querySelector(".js-video-start");
+  const videoSound = document.querySelector(".js-video-sound");
   const progressBar = document.querySelector(".js-vsl-progress");
   const unlockAt = 60;
   const fastProgressUntil = 15;
@@ -106,21 +107,39 @@
     source.type = "video/mp4";
     video.appendChild(source);
     videoPlayer?.classList.add("has-video");
+    video.autoplay = true;
     video.controls = false;
     video.disablePictureInPicture = true;
     video.setAttribute("controlslist", "nodownload nofullscreen noremoteplayback");
 
-    videoStart?.addEventListener("click", () => {
-      video.muted = false;
+    const startPlayback = (withSound = false) => {
+      video.muted = !withSound;
+      video.defaultMuted = !withSound;
       video.volume = 1;
       playbackStarted = true;
-      video.play()
-        .then(() => videoPlayer?.classList.add("is-started"))
+      return video.play()
+        .then(() => {
+          videoPlayer?.classList.add("is-started");
+          videoPlayer?.classList.toggle("is-audible", !video.muted);
+        })
         .catch(() => {
           playbackStarted = false;
           videoPlayer?.classList.remove("is-started");
         });
+    };
+
+    videoStart?.addEventListener("click", () => {
+      startPlayback(true);
     });
+
+    videoSound?.addEventListener("click", () => {
+      video.muted = false;
+      video.defaultMuted = false;
+      video.volume = 1;
+      videoPlayer?.classList.add("is-audible");
+    });
+
+    startPlayback(false);
 
     video.addEventListener("timeupdate", () => {
       if (!isCorrectingSeek) furthestTime = Math.max(furthestTime, video.currentTime);
