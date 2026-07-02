@@ -2,6 +2,25 @@
   const config = window.PAGE_CONFIG || {};
   const checkoutUrl = config.checkoutUrl || "#oferta";
   const youtubeVideoId = config.vslYoutubeId || "";
+  const legacyUnlockStorageKey = "manualAppearanceVslUnlocked";
+
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
+  try {
+    localStorage.removeItem(legacyUnlockStorageKey);
+  } catch (error) {
+    // Storage can be unavailable in privacy-restricted browsers.
+  }
+
+  const resetScrollPosition = () => {
+    if (location.hash) {
+      history.replaceState(null, "", `${location.pathname}${location.search}`);
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  };
+
+  resetScrollPosition();
 
   document.querySelectorAll(".js-checkout-link").forEach((link) => {
     link.setAttribute("href", checkoutUrl);
@@ -18,12 +37,6 @@
       history.pushState(null, "", hash);
     });
   });
-
-  if (location.hash) {
-    setTimeout(() => {
-      document.querySelector(location.hash)?.scrollIntoView({ behavior: "auto", block: "start" });
-    }, 80);
-  }
 
   const reveals = document.querySelectorAll(".reveal");
   const revealObserver = "IntersectionObserver" in window
@@ -51,7 +64,6 @@
   const progressBar = document.querySelector(".js-vsl-progress");
   const unlockAt = 60;
   const fastProgressUntil = 15;
-  const unlockStorageKey = "manualAppearanceVslUnlocked";
   const fallbackDuration = 123;
   let youtubePlayer = null;
   let playerReady = false;
@@ -63,19 +75,25 @@
 
     document.body.classList.remove("vsl-locked");
     document.body.classList.add("vsl-unlocked");
-
-    try {
-      localStorage.setItem(unlockStorageKey, "true");
-    } catch (error) {
-      // Storage may be unavailable in privacy-restricted browsers.
-    }
   };
 
-  try {
-    if (localStorage.getItem(unlockStorageKey) === "true") unlockPage();
-  } catch (error) {
-    // The first visit remains locked when storage is unavailable.
-  }
+  const resetFunnel = () => {
+    document.body.classList.remove("vsl-unlocked");
+    document.body.classList.add("vsl-locked");
+    videoPlayer?.classList.remove("is-audible", "has-error");
+    progressBar?.style.setProperty("transform", "scaleX(0)");
+    resetScrollPosition();
+
+    if (!playerReady || !youtubePlayer) return;
+
+    try {
+      youtubePlayer.mute();
+      youtubePlayer.seekTo(0, true);
+      playYoutubeVideo(false);
+    } catch (error) {
+      markPlayerError();
+    }
+  };
 
   const updateProgress = (currentTime = 0, playerDuration = fallbackDuration) => {
     if (!progressBar) return;
@@ -252,6 +270,25 @@
       youtubePlayer.pauseVideo();
     } else if (playbackStarted) {
       youtubePlayer.playVideo();
+    }
+  });
+
+  window.addEventListener("pageshow", () => {
+    resetFunnel();
+    window.requestAnimationFrame(() => {
+      resetScrollPosition();
+      window.requestAnimationFrame(resetScrollPosition);
+    });
+  });
+
+  window.addEventListener("pagehide", () => {
+    if (!playerReady || !youtubePlayer) return;
+
+    try {
+      youtubePlayer.pauseVideo();
+      youtubePlayer.seekTo(0, true);
+    } catch (error) {
+      // The iframe may already be detached while the page is closing.
     }
   });
 
