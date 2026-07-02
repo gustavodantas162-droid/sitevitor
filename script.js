@@ -1,8 +1,7 @@
 (function () {
   const config = window.PAGE_CONFIG || {};
   const checkoutUrl = config.checkoutUrl || "#oferta";
-  const videoUrl = config.vslVideoUrl || "";
-  const posterUrl = config.vslPosterUrl || "./assets/vitor-hero.jpg";
+  const youtubeVideoId = config.vslYoutubeId || "";
 
   document.querySelectorAll(".js-checkout-link").forEach((link) => {
     link.setAttribute("href", checkoutUrl);
@@ -46,7 +45,6 @@
     }
   });
 
-  const video = document.querySelector(".js-sales-video");
   const videoPlayer = document.querySelector(".video-player");
   const videoStart = document.querySelector(".js-video-start");
   const videoSound = document.querySelector(".js-video-sound");
@@ -54,9 +52,11 @@
   const unlockAt = 60;
   const fastProgressUntil = 15;
   const unlockStorageKey = "manualAppearanceVslUnlocked";
+  const fallbackDuration = 123;
+  let youtubePlayer = null;
+  let playerReady = false;
   let playbackStarted = false;
-  let furthestTime = 0;
-  let isCorrectingSeek = false;
+  let progressTimer = null;
 
   const unlockPage = () => {
     if (!document.body.classList.contains("vsl-locked")) return;
@@ -77,101 +77,183 @@
     // The first visit remains locked when storage is unavailable.
   }
 
-  const updateProgress = () => {
-    if (!video || !progressBar) return;
+  const updateProgress = (currentTime = 0, playerDuration = fallbackDuration) => {
+    if (!progressBar) return;
 
-    const currentTime = Math.max(0, video.currentTime || 0);
-    const duration = Number.isFinite(video.duration) && video.duration > fastProgressUntil
-      ? video.duration
-      : 122;
+    const safeCurrentTime = Math.max(0, currentTime || 0);
+    const duration = Number.isFinite(playerDuration) && playerDuration > fastProgressUntil
+      ? playerDuration
+      : fallbackDuration;
     let progress;
 
-    if (currentTime <= fastProgressUntil) {
-      progress = (currentTime / fastProgressUntil) * 0.5;
+    if (safeCurrentTime <= fastProgressUntil) {
+      progress = (safeCurrentTime / fastProgressUntil) * 0.5;
     } else {
-      progress = 0.5 + ((currentTime - fastProgressUntil) / (duration - fastProgressUntil)) * 0.5;
+      progress = 0.5 + ((safeCurrentTime - fastProgressUntil) / (duration - fastProgressUntil)) * 0.5;
     }
 
     progressBar.style.transform = `scaleX(${Math.min(1, Math.max(0, progress))})`;
 
-    if (currentTime >= unlockAt) unlockPage();
+    if (safeCurrentTime >= unlockAt) unlockPage();
   };
 
-  if (video) {
-    video.poster = posterUrl;
-  }
+  const readPlayerTime = () => {
+    if (!playerReady || !youtubePlayer) return;
 
-  if (video && videoUrl) {
-    const source = document.createElement("source");
-    source.src = videoUrl;
-    source.type = "video/mp4";
-    video.appendChild(source);
-    videoPlayer?.classList.add("has-video");
-    video.autoplay = true;
-    video.controls = false;
-    video.disablePictureInPicture = true;
-    video.setAttribute("controlslist", "nodownload nofullscreen noremoteplayback");
+    try {
+      const currentTime = youtubePlayer.getCurrentTime() || 0;
+      const duration = youtubePlayer.getDuration() || fallbackDuration;
+      updateProgress(currentTime, duration);
+    } catch (error) {
+      // The YouTube iframe can be unavailable for a brief moment while it reconnects.
+    }
+  };
 
-    const startPlayback = (withSound = false) => {
-      video.muted = !withSound;
-      video.defaultMuted = !withSound;
-      video.volume = 1;
+  const startProgressMonitor = () => {
+    if (progressTimer) return;
+    progressTimer = window.setInterval(readPlayerTime, 250);
+  };
+
+  const markPlayerError = () => {
+    playerReady = false;
+    playbackStarted = false;
+    videoPlayer?.classList.remove("has-video", "is-started", "is-audible");
+    videoPlayer?.classList.add("has-error");
+    if (progressTimer) {
+      window.clearInterval(progressTimer);
+      progressTimer = null;
+    }
+  };
+
+  const playYoutubeVideo = (withSound = false) => {
+    if (!playerReady || !youtubePlayer) return;
+
+    try {
+      if (withSound) {
+        youtubePlayer.unMute();
+        youtubePlayer.setVolume(100);
+      } else {
+        youtubePlayer.mute();
+      }
+      youtubePlayer.playVideo();
       playbackStarted = true;
-      return video.play()
-        .then(() => {
-          videoPlayer?.classList.add("is-started");
-          videoPlayer?.classList.toggle("is-audible", !video.muted);
-        })
-        .catch(() => {
-          playbackStarted = false;
-          videoPlayer?.classList.remove("is-started");
-        });
+      videoPlayer?.classList.add("has-video", "is-started");
+      videoPlayer?.classList.toggle("is-audible", withSound);
+      startProgressMonitor();
+    } catch (error) {
+      markPlayerError();
+    }
+  };
+
+  const loadYouTubeApi = () => new Promise((resolve, reject) => {
+    if (window.YT?.Player) {
+      resolve(window.YT);
+      return;
+    }
+
+    const previousReadyHandler = window.onYouTubeIframeAPIReady;
+    const timeout = window.setTimeout(() => reject(new Error("YouTube API timeout")), 12000);
+
+    window.onYouTubeIframeAPIReady = () => {
+      window.clearTimeout(timeout);
+      if (typeof previousReadyHandler === "function") previousReadyHandler();
+      resolve(window.YT);
     };
 
-    videoStart?.addEventListener("click", () => {
-      startPlayback(true);
-    });
+    const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+    if (existingScript) return;
 
-    videoSound?.addEventListener("click", () => {
-      video.muted = false;
-      video.defaultMuted = false;
-      video.volume = 1;
-      videoPlayer?.classList.add("is-audible");
-    });
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    script.async = true;
+    script.onerror = () => {
+      window.clearTimeout(timeout);
+      reject(new Error("YouTube API failed to load"));
+    };
+    document.head.appendChild(script);
+  });
 
-    startPlayback(false);
+  if (youtubeVideoId && document.getElementById("youtube-vsl-player")) {
+    loadYouTubeApi()
+      .then((YT) => {
+        youtubePlayer = new YT.Player("youtube-vsl-player", {
+          host: "https://www.youtube-nocookie.com",
+          videoId: youtubeVideoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            disablekb: 1,
+            enablejsapi: 1,
+            fs: 0,
+            iv_load_policy: 3,
+            modestbranding: 1,
+            playsinline: 1,
+            rel: 0,
+            mute: 1,
+            start: 0,
+            origin: location.origin
+          },
+          events: {
+            onReady: (event) => {
+              playerReady = true;
+              videoPlayer?.classList.remove("has-error");
+              videoPlayer?.classList.add("has-video");
 
-    video.addEventListener("timeupdate", () => {
-      if (!isCorrectingSeek) furthestTime = Math.max(furthestTime, video.currentTime);
-      updateProgress();
-    });
+              const iframe = event.target.getIframe();
+              iframe.setAttribute("title", "Apresentação do Manual da Aparência");
+              iframe.setAttribute("tabindex", "-1");
+              iframe.setAttribute("aria-hidden", "true");
 
-    video.addEventListener("seeking", () => {
-      if (!playbackStarted || isCorrectingSeek) return;
-      if (video.currentTime <= furthestTime + 0.75) return;
+              event.target.seekTo(0, true);
+              playYoutubeVideo(false);
+            },
+            onStateChange: (event) => {
+              if (event.data === YT.PlayerState.PLAYING) {
+                playbackStarted = true;
+                videoPlayer?.classList.add("has-video", "is-started");
+                startProgressMonitor();
+                return;
+              }
 
-      isCorrectingSeek = true;
-      video.currentTime = furthestTime;
-      isCorrectingSeek = false;
-    });
+              if (event.data === YT.PlayerState.PAUSED && playbackStarted && document.visibilityState === "visible") {
+                window.setTimeout(() => youtubePlayer?.playVideo(), 120);
+              }
 
-    video.addEventListener("pause", () => {
-      if (!playbackStarted || video.ended || document.visibilityState !== "visible") return;
-      video.play().catch(() => {});
-    });
-
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && playbackStarted && !video.ended) {
-        video.play().catch(() => {});
-      }
-    });
-
-    video.addEventListener("ended", updateProgress);
-
-    video.addEventListener("error", () => {
-      videoPlayer?.classList.remove("has-video");
-    });
+              if (event.data === YT.PlayerState.ENDED) {
+                readPlayerTime();
+                playbackStarted = false;
+                if (progressTimer) {
+                  window.clearInterval(progressTimer);
+                  progressTimer = null;
+                }
+              }
+            },
+            onError: markPlayerError
+          }
+        });
+      })
+      .catch(markPlayerError);
   }
+
+  videoStart?.addEventListener("click", () => {
+    if (!playerReady) {
+      location.reload();
+      return;
+    }
+    playYoutubeVideo(true);
+  });
+
+  videoSound?.addEventListener("click", () => playYoutubeVideo(true));
+
+  document.addEventListener("visibilitychange", () => {
+    if (!playerReady || !youtubePlayer) return;
+
+    if (document.visibilityState === "hidden") {
+      youtubePlayer.pauseVideo();
+    } else if (playbackStarted) {
+      youtubePlayer.playVideo();
+    }
+  });
 
   document.querySelectorAll("details").forEach((detail) => {
     detail.addEventListener("toggle", () => {
